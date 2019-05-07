@@ -60,6 +60,7 @@ type UpstreamConfig struct {
 	FlushInterval         time.Duration
 	HeaderOverrides       map[string]string
 	SkipRequestSigning    bool
+	CookieName            string
 }
 
 // RouteConfig maps to the yaml config fields,
@@ -89,6 +90,9 @@ type OptionsConfig struct {
 	ResetDeadline      time.Duration     `yaml:"reset_deadline"`
 	FlushInterval      time.Duration     `yaml:"flush_interval"`
 	SkipRequestSigning bool              `yaml:"skip_request_signing"`
+
+	// set upstream
+	CookieName string
 }
 
 // ErrParsingConfig is an error specific to config parsing.
@@ -390,6 +394,7 @@ func parseOptionsConfig(proxy *UpstreamConfig, defaultOpts *OptionsConfig) error
 	proxy.TLSSkipVerify = dst.TLSSkipVerify
 	proxy.PreserveHost = dst.PreserveHost
 	proxy.SkipRequestSigning = dst.SkipRequestSigning
+	proxy.CookieName = dst.CookieName
 
 	proxy.RouteConfig.Options = nil
 
@@ -399,4 +404,19 @@ func parseOptionsConfig(proxy *UpstreamConfig, defaultOpts *OptionsConfig) error
 func cleanWhiteSpace(s string) string {
 	// This trims all white space from a service name and collapses all remaining space to `_`
 	return space.ReplaceAllString(strings.TrimSpace(s), "_") //
+}
+
+func generateHmacAuth(signatureKey string) (hmacauth.HmacAuth, error) {
+	components := strings.Split(signatureKey, ":")
+	if len(components) != 2 {
+		return nil, fmt.Errorf("invalid signature hash:key spec")
+	}
+
+	algorithm, secret := components[0], components[1]
+	hash, err := hmacauth.DigestNameToCryptoHash(algorithm)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported signature hash algorithm: %s", algorithm)
+	}
+	auth := hmacauth.NewHmacAuth(hash, []byte(secret), HMACSignatureHeader, SignatureHeaders)
+	return auth, nil
 }
