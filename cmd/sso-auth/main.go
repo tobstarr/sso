@@ -32,25 +32,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	emailValidator := func(p *auth.Authenticator) error {
-		if len(opts.EmailAddresses) != 0 {
-			p.Validator = options.NewEmailAddressValidator(opts.EmailAddresses)
-		} else {
-			p.Validator = options.NewEmailDomainValidator(opts.EmailDomains)
-		}
-		return nil
-	}
-
-	authenticator, err := auth.NewAuthenticator(opts, emailValidator, auth.AssignProvider(opts), auth.SetCookieStore(opts), auth.AssignStatsdClient(opts))
+	authMux, err := auth.NewAuthenticatorMux(opts)
 	if err != nil {
-		logger.Error(err, "error creating new Authenticator")
+		logger.Error(err, "error creating new AuthenticatorMux")
 		os.Exit(1)
 	}
-	defer authenticator.Stop()
+	defer authMux.Stop()
 
 	// we leave the message field blank, which will inherit the stdlib timeout page which is sufficient
 	// and better than other naive messages we would currently place here
-	timeoutHandler := http.TimeoutHandler(authenticator.ServeMux, opts.RequestTimeout, "")
+	timeoutHandler := http.TimeoutHandler(authMux, opts.RequestTimeout, "")
 
 	s := &http.Server{
 		Addr:         fmt.Sprintf(":%d", opts.Port),

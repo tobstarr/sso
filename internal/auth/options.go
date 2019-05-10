@@ -102,7 +102,10 @@ type Options struct {
 
 	// These options allow for other providers besides Google, with potential overrides.
 	Provider         string `envconfig:"PROVIDER" default:"google"`
+	ProviderSlug     string `envconfig:"PROVIDER_SLUG" default:"google"`
 	ProviderServerID string `envconfig:"PROVIDER_SERVER_ID" default:"default"`
+
+	DefaultProvider string `envconfig:"DEFAULT_PROVIDER" default:"google"`
 
 	SignInURL      string `envconfig:"SIGNIN_URL"`
 	RedeemURL      string `envconfig:"REDEEM_URL"`
@@ -257,6 +260,7 @@ func validateCookieName(o *Options, msgs []string) []string {
 
 func newProvider(o *Options) (providers.Provider, error) {
 	p := &providers.ProviderData{
+		Slug:               o.ProviderSlug,
 		Scope:              o.Scope,
 		ClientID:           o.ClientID,
 		ClientSecret:       o.ClientSecret,
@@ -323,6 +327,15 @@ func AssignProvider(opts *Options) func(*Authenticator) error {
 		var err error
 		proxy.provider, err = newProvider(opts)
 		return err
+	}
+}
+
+// SetProvider is a function that takes an Options struct and assigns the
+// appropriate provider to the proxy.
+func SetProvider(provider providers.Provider) func(*Authenticator) error {
+	return func(a *Authenticator) error {
+		a.provider = provider
+		return nil
 	}
 }
 

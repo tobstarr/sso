@@ -87,7 +87,7 @@ type getProfileResponse struct {
 }
 
 // SetCookieStore sets the cookie store to use a miscreant cipher
-func SetCookieStore(opts *Options) func(*Authenticator) error {
+func SetCookieStore(opts *Options, providerSlug string) func(*Authenticator) error {
 	return func(a *Authenticator) error {
 		decodedAuthCodeSecret, err := base64.StdEncoding.DecodeString(opts.AuthCodeSecret)
 		if err != nil {
@@ -98,7 +98,8 @@ func SetCookieStore(opts *Options) func(*Authenticator) error {
 			return err
 		}
 
-		cookieStore, err := sessions.NewCookieStore(opts.CookieName,
+		cookieName := fmt.Sprintf("%s_%s", opts.CookieName, providerSlug)
+		cookieStore, err := sessions.NewCookieStore(cookieName,
 			sessions.CreateMiscreantCookieCipher(opts.decodedCookieSecret),
 			func(c *sessions.CookieStore) error {
 				c.CookieDomain = opts.CookieDomain
