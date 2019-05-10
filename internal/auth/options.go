@@ -345,7 +345,7 @@ func AssignStatsdClient(opts *Options) func(*Authenticator) error {
 	return func(proxy *Authenticator) error {
 		logger := log.NewLogEntry()
 
-		StatsdClient, err := newStatsdClient(opts.StatsdHost, opts.StatsdPort)
+		StatsdClient, err := NewStatsdClient(opts.StatsdHost, opts.StatsdPort)
 		if err != nil {
 			return fmt.Errorf("error setting up statsd client error=%s", err)
 		}

@@ -14,7 +14,7 @@ import (
 
 func newTestStatsdClient(t *testing.T) (*statsd.Client, string, int) {
 
-	client, err := newStatsdClient("127.0.0.1", 8125)
+	client, err := NewStatsdClient("127.0.0.1", 8125)
 	if err != nil {
 		t.Fatalf("error starting new statsd client %s", err.Error())
 	}
@@ -66,7 +66,7 @@ func TestNewStatsd(t *testing.T) {
 			defer pc.Close()
 			opts := NewOptions()
 			opts.Validate()
-			client, err := newStatsdClient(tc.host, tc.port)
+			client, err := NewStatsdClient(tc.host, tc.port)
 			if err != nil {
 				t.Fatalf("error starting new statsd client: %s", err.Error())
 			}

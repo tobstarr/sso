@@ -11,7 +11,7 @@ import (
 	"github.com/datadog/datadog-go/statsd"
 )
 
-func newStatsdClient(host string, port int) (*statsd.Client, error) {
+func NewStatsdClient(host string, port int) (*statsd.Client, error) {
 	client, err := statsd.New(net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
