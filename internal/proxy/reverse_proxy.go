@@ -27,7 +27,7 @@ type upstreamTransport struct {
 	insecureSkipVerify bool
 }
 
-// RoundTrip round trips the request and deletes security headers before returning the response.
+// RoundTrip fulfilles the RoundTripper interface.
 func (t *upstreamTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	logger := log.NewLogEntry()
 
@@ -114,11 +114,15 @@ func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (htt
 	return reverseProxy, nil
 }
 
+// Director implements the Director func providerd in the httputil reverse proxy.
+// This implements a variety fo director behavior based on configuration defined
+// in the UpstreamConfig.
 type Director struct {
 	config *UpstreamConfig
 	signer *RequestSigner
 }
 
+// DirectorFunc supplies basic director func behavior.
 func (d *Director) DirectorFunc(target *url.URL) func(*http.Request) {
 	return func(req *http.Request) {
 		targetQuery := target.RawQuery
@@ -155,10 +159,13 @@ func (d *Director) DirectorFunc(target *url.URL) func(*http.Request) {
 	}
 }
 
+// StaticDirectorFunc is a convenience handler around StaticDirectorFunc.
 func (d *Director) StaticDirectorFunc(route *SimpleRoute) func(*http.Request) {
 	return d.DirectorFunc(route.ToURL)
 }
 
+// RewriteDirectorFunc is capable of using a regexp to re-write requests and dynamically route
+// requests to various upstreams.
 func (d *Director) RewriteDirectorFunc(route *RewriteRoute) func(*http.Request) {
 	return func(req *http.Request) {
 		// we do this to rewrite requests
@@ -180,6 +187,7 @@ func (d *Director) RewriteDirectorFunc(route *RewriteRoute) func(*http.Request) 
 	}
 }
 
+// newTimeoutHandler creates a new TimeoutHandler middleware with a preconfigured message based on service name and timeout
 func newTimeoutHandler(handler http.Handler, config *UpstreamConfig) http.Handler {
 	timeoutMsg := fmt.Sprintf("%s failed to respond within the %s timeout period", config.Service, config.Timeout)
 	return http.TimeoutHandler(handler, config.Timeout, timeoutMsg)
