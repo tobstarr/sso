@@ -29,9 +29,11 @@ type upstreamTransport struct {
 
 // RoundTrip round trips the request and deletes security headers before returning the response.
 func (t *upstreamTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	logger := log.NewLogEntry()
+
 	resp, err := t.getTransport().RoundTrip(req)
 	if err != nil {
-		log.Error(err, "error in upstreamTransport RoundTrip")
+		logger.Error(err, "error in upstreamTransport RoundTrip")
 		return nil, err
 	}
 	return resp, err
