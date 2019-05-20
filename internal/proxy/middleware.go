@@ -26,8 +26,8 @@ func setHeaders(h http.Handler, headers map[string]string) http.Handler {
 		}
 		h.ServeHTTP(rw, req)
 	})
-
 }
+
 func setSecurityHeaders(h http.Handler) http.Handler {
 	return setHeaders(h, securityHeaders)
 }
