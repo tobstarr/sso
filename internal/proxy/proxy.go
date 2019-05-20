@@ -34,6 +34,9 @@ func New(opts *Options) (*SSOProxy, error) {
 	hostRouter := hostmux.NewRouter()
 	for _, upstreamConfig := range opts.upstreamConfigs {
 		handler, err := NewUpstreamReverseProxy(upstreamConfig, requestSigner)
+		if err != nil {
+			return nil, err
+		}
 
 		optFuncs = append(optFuncs,
 			SetProvider(opts.provider),
