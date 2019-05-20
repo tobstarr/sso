@@ -14,9 +14,9 @@ import (
 	log "github.com/buzzfeed/sso/internal/pkg/logging"
 )
 
-// upstreamTransport is used to ensure that upstreams cannot override the
-// security headers applied by sso_proxy. Also includes functionality to rotate
-// http.Transport objects to ensure tcp connection reset deadlines are not exceeded
+// upstreamTransport is used to to rotate http.Transport objects to ensure SSO
+// proactively rotates tcp connections on reset deadlines. This is especially useful
+// for environments where upstream dns entries changes frequently.
 type upstreamTransport struct {
 	mux sync.Mutex
 
@@ -66,6 +66,9 @@ func (t *upstreamTransport) getTransport() *http.Transport {
 	return t.transport
 }
 
+// NewUpstreamReverseProxy implements our reverse proxy behavior for each upstream. It is configurable
+// using the passed in UpstreamConfig and returns a generic http.Handler. This reverse proxy implements
+// a variety of directors based on the behavior designed by the configuration, including static and regexp routes.
 func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (http.Handler, error) {
 	baseDirector := &Director{
 		config: config,
