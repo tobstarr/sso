@@ -36,6 +36,7 @@ func (t *upstreamTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		logger.Error(err, "error in upstreamTransport RoundTrip")
 		return nil, err
 	}
+
 	return resp, err
 }
 
@@ -72,7 +73,6 @@ func (t *upstreamTransport) getTransport() *http.Transport {
 func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (http.Handler, error) {
 	baseDirector := &Director{
 		config: config,
-		signer: signer,
 	}
 
 	var directorFunc func(*http.Request)
@@ -91,6 +91,7 @@ func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (htt
 			resetDeadline:      config.ResetDeadline,
 			insecureSkipVerify: config.TLSSkipVerify,
 		},
+		FlushInterval: config.FlushInterval,
 		ModifyResponse: func(resp *http.Response) error {
 			// DRAGONS: This helps implement special behavior regarding security headers.
 			//
@@ -104,14 +105,23 @@ func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (htt
 		},
 	}
 
-	if config.FlushInterval != 0 {
-		reverseProxy.FlushInterval = config.FlushInterval
-	}
+	// We cast this to an http.Handler so the following middleware logic follows naturally.
+	var handler http.Handler = reverseProxy
+
+	// Apply a timeout handler if configured
 	if config.Timeout != 0 {
-		return newTimeoutHandler(reverseProxy, config), nil
+		handler = newTimeoutHandler(handler, config)
 	}
 
-	return reverseProxy, nil
+	// Sign the request if configured
+	if !config.SkipRequestSigning {
+		handler = newSigningHandler(handler, config, signer)
+	}
+
+	// Delete the session cookie before it is proxied and used to sign the request
+	handler = deleteCookieHandler(handler, config.CookieName)
+
+	return handler, nil
 }
 
 // Director implements the Director func providerd in the httputil reverse proxy.
@@ -119,7 +129,6 @@ func NewUpstreamReverseProxy(config *UpstreamConfig, signer *RequestSigner) (htt
 // in the UpstreamConfig.
 type Director struct {
 	config *UpstreamConfig
-	signer *RequestSigner
 }
 
 // DirectorFunc supplies basic director func behavior.
@@ -135,6 +144,7 @@ func (d *Director) DirectorFunc(target *url.URL) func(*http.Request) {
 		} else {
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
+
 		if _, ok := req.Header["User-Agent"]; !ok {
 			// explicitly disable User-Agent so it's not set to default value
 			req.Header.Set("User-Agent", "")
@@ -144,17 +154,6 @@ func (d *Director) DirectorFunc(target *url.URL) func(*http.Request) {
 		req.Header.Add("X-Forwarded-Host", req.Host)
 		if !d.config.PreserveHost {
 			req.Host = target.Host
-		}
-
-		// delete session cookie from the request before it is proxied
-		deleteCookie(req, d.config.CookieName)
-
-		// sign request
-		if d.signer != nil && !d.config.SkipRequestSigning {
-			d.signer.Sign(req)
-		}
-		if d.config.HMACAuth != nil && !d.config.SkipRequestSigning {
-			d.config.HMACAuth.SignRequest(req)
 		}
 	}
 }
@@ -185,6 +184,29 @@ func (d *Director) RewriteDirectorFunc(route *RewriteRoute) func(*http.Request) 
 
 		d.DirectorFunc(target)(req)
 	}
+}
+
+// deleteCookieHandler removes the configured session cookie
+func deleteCookieHandler(handler http.Handler, cookieName string) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		deleteCookie(req, cookieName)
+		handler.ServeHTTP(rw, req)
+	})
+}
+
+// newSigningHandler creates middleware that signs requests using the configured signing method.
+func newSigningHandler(handler http.Handler, config *UpstreamConfig, signer *RequestSigner) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if config.HMACAuth != nil {
+			config.HMACAuth.SignRequest(req)
+		}
+
+		if signer != nil {
+			signer.Sign(req)
+		}
+
+		handler.ServeHTTP(rw, req)
+	})
 }
 
 // newTimeoutHandler creates a new TimeoutHandler middleware with a preconfigured message based on service name and timeout
